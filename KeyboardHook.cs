@@ -1,6 +1,7 @@
 ﻿using Jera.helpers;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -46,8 +47,6 @@ namespace Jera
         private static extern uint SendInput(uint nInputs, Input[] pInputs, int cbSize);
         [DllImport("user32.dll")]
         private static extern IntPtr GetMessageExtraInfo();
-        // [DllImport("user32.dll")]
-        // internal static extern uint MapVirtualKeyEx(uint uCode, uint uMapType);
         public enum HookType : int
         {
             WH_JOURNALRECORD = 0,
@@ -67,6 +66,7 @@ namespace Jera
             WH_MOUSE_LL = 14
         }
         private IntPtr HookID = IntPtr.Zero;
+        private KeyHandler keyHandler = new KeyHandler();
         CallbackDelegate TheHookCB = null;
         //Start hook
         public KeyboardHook(bool Global)
@@ -148,7 +148,6 @@ namespace Jera
                     {
                         if (KeyDown != null)
                         {
-                            Console.WriteLine(vkCode);
                             // KBDLLHookStruct replacementKey = (KBDLLHookStruct)Marshal.PtrToStructure(L, typeof(KBDLLHookStruct));
                             // replacementKey.vkCode = 89;
                             // Marshal.StructureToPtr(replacementKey, L, false);
@@ -156,40 +155,52 @@ namespace Jera
                             // KBDLLHookStruct replacementKey = (KBDLLHookStruct)Marshal.PtrToStructure(L, typeof(KBDLLHookStruct));
                             // replacementKey.vkCode = 90; // char 'Z'
                             // Marshal.StructureToPtr(replacementKey, L, false);
-                            Input[] inputs =
-                            [
-                                new Input
-                                {
-                                    type = (int)InputType.Keyboard,
-                                    u = new InputUnion
+                            // string myText = "ы"; // can be input via a Forms textbox
+                            string myText = keyHandler.getOutput(vkCode.ToString());
+
+                            if (myText != "2") {
+                                char[] chars = myText.ToCharArray();
+                                var foo = (Keys)vkCode;
+
+                                UInt16 uniCode = chars[0];
+                                Console.OutputEncoding = System.Text.Encoding.Unicode;
+                                Input[] inputs =
+                                [
+                                    new Input
                                     {
-                                        ki = new KeyboardInput
+                                        type = (int)InputType.Keyboard,
+                                        u = new InputUnion
                                         {
-                                            wVk = 65,
-                                            wScan = 0x11,
-                                            dwFlags = (uint)(KeyEventF.KeyDown),
-                                            dwExtraInfo = GetMessageExtraInfo(),
+                                            ki = new KeyboardInput
+                                            {
+                                                wVk = 0,
+                                                wScan = uniCode,
+                                                dwFlags = (uint)(KeyEventF.KeyDown | KeyEventF.Unicode),
+                                                dwExtraInfo = GetMessageExtraInfo(),
+                                            }
+                                        }
+                                    },
+                                    new Input
+                                    {
+                                        type = (int)InputType.Keyboard,
+                                        u = new InputUnion
+                                        {
+                                            ki = new KeyboardInput
+                                            {
+                                                wVk = 0,
+                                                wScan = uniCode,
+                                                dwFlags = (uint)(KeyEventF.KeyUp | KeyEventF.Unicode),
+                                                dwExtraInfo = GetMessageExtraInfo(),
+                                            }
                                         }
                                     }
-                                },
-                                new Input
-                                {
-                                    type = (int)InputType.Keyboard,
-                                    u = new InputUnion
-                                    {
-                                        ki = new KeyboardInput
-                                        {
-                                            wVk = 65,
-                                            wScan = 0x11,
-                                            dwFlags = (uint)(KeyEventF.KeyUp),
-                                            dwExtraInfo = GetMessageExtraInfo(),
-                                        }
-                                    }
-                                }
-                            ];
-                            SendInput(1, inputs, Marshal.SizeOf(typeof(Input)));
-                            KeyDown((Keys)vkCode, GetShiftPressed(), GetCtrlPressed(), GetAltPressed());
-                            return 1;
+                                ];
+
+                                SendInput((uint)inputs.Count(), inputs, Marshal.SizeOf(typeof(Input)));
+                                KeyDown((Keys)vkCode, GetShiftPressed(), GetCtrlPressed(), GetAltPressed());
+                                return 1;
+                            }
+
                         }
                     }
                     if (kEvent == KeyEvents.KeyUp || kEvent == KeyEvents.SKeyUp)
