@@ -1,13 +1,6 @@
 ﻿using Jera.helpers;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Globalization;
-using System.Linq;
 using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
-using static Jera.KeyboardHook;
+using System.Windows.Forms;
 
 namespace Jera
 
@@ -67,6 +60,7 @@ namespace Jera
         }
         private IntPtr HookID = IntPtr.Zero;
         private KeyHandler keyHandler = new KeyHandler();
+        private Sequence sequence = new Sequence();
         CallbackDelegate TheHookCB = null;
         //Start hook
         public KeyboardHook(bool Global)
@@ -140,31 +134,28 @@ namespace Jera
                 else
                 {
                     KeyEvents kEvent = (KeyEvents)W;
-                    Int32 vkCode = Marshal.ReadInt32((IntPtr)L); //Leser vkCode som er de første 32 bits hvor L peker.
+                    Int32 vkCode = Marshal.ReadInt32((IntPtr)L);
                     if (kEvent != KeyEvents.KeyDown && kEvent != KeyEvents.KeyUp && kEvent != KeyEvents.SKeyDown && kEvent != KeyEvents.SKeyUp)
                     {
                     }
+                    if (GetBackspacePressed()) sequence.RemoveFromSequence();
+    
                     if (kEvent == KeyEvents.KeyDown || kEvent == KeyEvents.SKeyDown)
                     {
                         if (KeyDown != null)
                         {
-                            // KBDLLHookStruct replacementKey = (KBDLLHookStruct)Marshal.PtrToStructure(L, typeof(KBDLLHookStruct));
-                            // replacementKey.vkCode = 89;
-                            // Marshal.StructureToPtr(replacementKey, L, false);
-                            // vkCode = Marshal.ReadInt32((IntPtr)L);
-                            // KBDLLHookStruct replacementKey = (KBDLLHookStruct)Marshal.PtrToStructure(L, typeof(KBDLLHookStruct));
-                            // replacementKey.vkCode = 90; // char 'Z'
-                            // Marshal.StructureToPtr(replacementKey, L, false);
-                            // string myText = "ы"; // can be input via a Forms textbox
-                            string myText = keyHandler.getOutput(vkCode.ToString());
-
-                            if (myText != "2") {
-                                char[] chars = myText.ToCharArray();
-                                var foo = (Keys)vkCode;
-
-                                UInt16 uniCode = chars[0];
+                            var key = (Keys)vkCode;
+                            if (vkCode != 231) sequence.AddToSequence(key.ToString(), vkCode);
+                            List<Int32> keySequence = sequence.GetKeySequence();
+                            // Console.WriteLine($"count from hook, {keySequence.Count}");
+                            // string myText = keyHandler.getOutput(vkCode.ToString(), GetShiftPressed());
+                            Input[] inputs2 = keyHandler.getOutput2(vkCode.ToString(), GetShiftPressed(), keySequence);
+                            if (inputs2.Length != 0) {
+                                // char[] chars = myText.ToCharArray();
+                                // UInt16 uniCode = chars[0];
                                 Console.OutputEncoding = System.Text.Encoding.Unicode;
-                                Input[] inputs =
+
+                                /* Input[] inputs =
                                 [
                                     new Input
                                     {
@@ -194,9 +185,9 @@ namespace Jera
                                             }
                                         }
                                     }
-                                ];
-
-                                SendInput((uint)inputs.Count(), inputs, Marshal.SizeOf(typeof(Input)));
+                                ]; */
+                                Console.WriteLine($"Count, {(uint)inputs2.Count()}");
+                                SendInput((uint)inputs2.Count(), inputs2, Marshal.SizeOf(typeof(Input)));
                                 KeyDown((Keys)vkCode, GetShiftPressed(), GetCtrlPressed(), GetAltPressed());
                                 return 1;
                             }
@@ -205,14 +196,13 @@ namespace Jera
                     }
                     if (kEvent == KeyEvents.KeyUp || kEvent == KeyEvents.SKeyUp)
                     {
-                        // if (KeyUp != null) KeyUp((Keys)vkCode, GetShiftPressed(), GetCtrlPressed(), GetAltPressed());
+                        if (KeyUp != null) KeyUp((Keys)vkCode, GetShiftPressed(), GetCtrlPressed(), GetAltPressed());
                     }
                 }
             }
             catch (Exception e)
             {
                 if (OnError != null) OnError(e);
-                //Ignore all errors...
             }
             return CallNextHookEx(HookID, Code, W, L);
         }
@@ -255,20 +245,11 @@ namespace Jera
             if (state > 1 || state < -1) return true;
             return false;
         }
-
-        /* private static void SendUnicodeChar(char input)
+        public static bool GetBackspacePressed()
         {
-            var inputStruct = new NativeWinApi.Input();
-            inputStruct.type = NativeWinApi.INPUT_KEYBOARD;
-            inputStruct.ki.wVk = 0;
-            inputStruct.ki.wScan = input;
-            inputStruct.ki.time = 0;
-            var flags = NativeWinApi.KEYEVENTF_UNICODE;
-            inputStruct.ki.dwFlags = flags;
-            inputStruct.ki.dwExtraInfo = NativeWinApi.GetMessageExtraInfo();
-
-            NativeWinApi.Input[] ip = { inputStruct };
-            NativeWinApi.SendInput(1, ip, Marshal.SizeOf(inputStruct)); 
-        } */
+            int state = GetKeyState(Keys.Back);
+            if (state > 1 || state < -1) return true;
+            return false;
+        }
     }
 }
