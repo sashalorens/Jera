@@ -4,13 +4,14 @@ using Newtonsoft.Json.Converters;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Unicode;
+using Newtonsoft.Json.Linq;
 
 namespace Jera
 {
 
     public class JSONConverter
     {
-        public static Dictionary<string, Dictionary<string, string>> FromJson(string json) => JsonConvert.DeserializeObject<Dictionary<string, Dictionary<string, string>>>(json, Converter.Settings);
+        public static JObject? FromJson(string json) => JsonConvert.DeserializeObject<JObject>(json, Converter.Settings);
     }
 
     public static class Serialize
