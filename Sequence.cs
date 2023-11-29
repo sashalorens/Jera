@@ -35,7 +35,7 @@ namespace Jera
                 sequence = sequence.Substring(1, sequence.Length - 1) + input;
             }
 
-            if (keySequence.Count < 3) {
+            if (keySequence.Count < 4) {
                 keySequence.Add(code);
             }
             else

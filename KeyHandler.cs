@@ -1,17 +1,18 @@
 ﻿using System.Collections.Generic;
 using System.Text;
 using Jera.helpers;
+using Newtonsoft.Json.Linq;
 
 namespace Jera
 {
     internal class KeyHandler
     {
-        private Dictionary<string, Dictionary<string, string>> jsonFile;
+        private JObject? jsonFile;
         Sequence sequence;
         InputConstructor inputConstructor;
-        string lastSimpleChar = "";
-        bool isLastCharWasCombined = false;
+        string lastCombination = string.Empty;
         long prevTimestamp = 0;
+        const string BACKSPACE_CODE = "8";
 
         public KeyHandler()
         {
@@ -21,7 +22,7 @@ namespace Jera
             inputConstructor = new InputConstructor();
         }
 
-        public Dictionary<string, Dictionary<string, string>> LoadJson()
+        public JObject? LoadJson()
         {
             String jsonString = File.ReadAllText("../../../config.json", Encoding.UTF8);
             var jsonFile = JSONConverter.FromJson(jsonString);
@@ -36,18 +37,25 @@ namespace Jera
             return unicode;
         }
 
-        public string getOutput(string key, bool isShiftPressed)
-        {
-            if (jsonFile == null || !jsonFile["keys"].ContainsKey(key)) return "";
-            string value = jsonFile["keys"][key];
-            string result = isShiftPressed ? value.ToUpper() : value;
-            return result;
+        int ParseDelay(string value) {
+            int delay = 0;
+            try
+            {
+                delay = Int32.Parse(value);
+            }
+            catch (FormatException)
+            {
+                Console.WriteLine($"Unable to parse delay '{value}'");
+            }
+            return delay;
         }
 
-        public Input[] getOutput2(string key, bool isShiftPressed, List<Int32> seq)
+        public Input[] GetOutput(string key, bool isShiftPressed, List<Int32> seq)
         {
-            if (jsonFile == null || !jsonFile["keys"].ContainsKey(key)) return [];
-            string value = jsonFile["keys"][key];
+            Dictionary<string, string> keys = jsonFile!["keys"]!.ToObject<Dictionary<string, string>>()!; ;
+            if (jsonFile == null || keys == null || !keys.ContainsKey(key)) return [];
+            string value = keys[key];
+            int delayTime = ParseDelay(jsonFile["delayTime"]!.ToString());
             string combinedValue = "";
             List<string> maybeCombined = new List<string>();
 
@@ -68,20 +76,34 @@ namespace Jera
                 }
             }
 
-            foreach(string combination in maybeCombined)
+            maybeCombined = maybeCombined.OrderByDescending(x => x.Length).ToList();
+
+            string maybeLastCombination = string.Empty;
+
+            foreach (string combination in maybeCombined)
             {
-                if (jsonFile["keys"].ContainsKey(combination)) {
-                    combinedValue = jsonFile["keys"][combination];
+                // handling triple combinations where first two chars are an another combination
+                string tempCombination = combination;
+
+                if (lastCombination != string.Empty && tempCombination.Contains(lastCombination))
+                {
+                    string[] parts = tempCombination.Split('&').Where(part => part != BACKSPACE_CODE).ToArray();
+                    tempCombination = string.Join("&", parts);
+                }
+
+                if (keys.ContainsKey(tempCombination)) {
+                    combinedValue = keys[tempCombination];
+                    maybeLastCombination = tempCombination;
                 }
             }
 
             long timestamp = new DateTimeOffset(DateTime.UtcNow).ToUnixTimeMilliseconds();
             long diff = timestamp - prevTimestamp;
 
-            if (combinedValue != "" && prevTimestamp != 0 && diff < 555)
+            if (combinedValue != "" && prevTimestamp != 0 && diff < delayTime)
             {
                 UInt16 combinedUnicode = GetValue(combinedValue, isShiftPressed);
-                isLastCharWasCombined = true;
+                lastCombination = maybeLastCombination;
                 prevTimestamp = timestamp;
                 return inputConstructor.GetInputs(combinedUnicode, true);
             }

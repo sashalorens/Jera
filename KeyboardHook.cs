@@ -10,9 +10,9 @@ namespace Jera
         bool Global = false;
         public delegate void ErrorEventHandler(Exception e);
         public delegate void LocalKeyEventHandler(Keys key, bool Shift, bool Ctrl, bool Alt);
-        public event LocalKeyEventHandler KeyDown;
-        public event LocalKeyEventHandler KeyUp;
-        public event ErrorEventHandler OnError;
+        public event LocalKeyEventHandler? KeyDown;
+        public event LocalKeyEventHandler? KeyUp;
+        public event ErrorEventHandler? OnError;
         public delegate int CallbackDelegate(int Code, IntPtr W, IntPtr L);
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
         public struct KBDLLHookStruct
@@ -61,7 +61,7 @@ namespace Jera
         private IntPtr HookID = IntPtr.Zero;
         private KeyHandler keyHandler = new KeyHandler();
         private Sequence sequence = new Sequence();
-        CallbackDelegate TheHookCB = null;
+        CallbackDelegate TheHookCB;
         //Start hook
         public KeyboardHook(bool Global)
         {
@@ -107,7 +107,6 @@ namespace Jera
         private int KeybHookProc(int Code, IntPtr W, IntPtr L)
         {
 
-            KBDLLHookStruct LS = new KBDLLHookStruct();
             if (Code < 0)
             {
                 return CallNextHookEx(HookID, Code, W, L);
@@ -145,48 +144,13 @@ namespace Jera
                         if (KeyDown != null)
                         {
                             var key = (Keys)vkCode;
-                            if (vkCode != 231) sequence.AddToSequence(key.ToString(), vkCode);
-                            List<Int32> keySequence = sequence.GetKeySequence();
-                            // Console.WriteLine($"count from hook, {keySequence.Count}");
-                            // string myText = keyHandler.getOutput(vkCode.ToString(), GetShiftPressed());
-                            Input[] inputs2 = keyHandler.getOutput2(vkCode.ToString(), GetShiftPressed(), keySequence);
-                            if (inputs2.Length != 0) {
-                                // char[] chars = myText.ToCharArray();
-                                // UInt16 uniCode = chars[0];
-                                Console.OutputEncoding = System.Text.Encoding.Unicode;
 
-                                /* Input[] inputs =
-                                [
-                                    new Input
-                                    {
-                                        type = (int)InputType.Keyboard,
-                                        u = new InputUnion
-                                        {
-                                            ki = new KeyboardInput
-                                            {
-                                                wVk = 0,
-                                                wScan = uniCode,
-                                                dwFlags = (uint)(KeyEventF.KeyDown | KeyEventF.Unicode),
-                                                dwExtraInfo = GetMessageExtraInfo(),
-                                            }
-                                        }
-                                    },
-                                    new Input
-                                    {
-                                        type = (int)InputType.Keyboard,
-                                        u = new InputUnion
-                                        {
-                                            ki = new KeyboardInput
-                                            {
-                                                wVk = 0,
-                                                wScan = uniCode,
-                                                dwFlags = (uint)(KeyEventF.KeyUp | KeyEventF.Unicode),
-                                                dwExtraInfo = GetMessageExtraInfo(),
-                                            }
-                                        }
-                                    }
-                                ]; */
-                                Console.WriteLine($"Count, {(uint)inputs2.Count()}");
+                            if (vkCode != 231) sequence.AddToSequence(key.ToString(), vkCode);
+
+                            List<Int32> keySequence = sequence.GetKeySequence();
+                            Input[] inputs2 = keyHandler.GetOutput(vkCode.ToString(), GetShiftPressed(), keySequence);
+                            if (inputs2.Length != 0) {
+                                Console.OutputEncoding = System.Text.Encoding.Unicode;
                                 SendInput((uint)inputs2.Count(), inputs2, Marshal.SizeOf(typeof(Input)));
                                 KeyDown((Keys)vkCode, GetShiftPressed(), GetCtrlPressed(), GetAltPressed());
                                 return 1;
